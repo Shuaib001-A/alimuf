@@ -1,0 +1,278 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ AUTH & USERS ============
+
+enum Role {
+  ADMIN
+  MODERATOR
+  USER
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          Role      @default(USER)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============ ORGANIZATION STRUCTURE ============
+
+enum Position {
+  PRESIDENT
+  VICE_PRESIDENT
+  GENERAL_SECRETARY
+  FINANCIAL_SECRETARY
+  WELFARE_OFFICER
+  MEMBER
+}
+
+model CommitteeMembers {
+  id            String   @id @default(cuid())
+  fullName      String
+  position      Position
+  biography     String   @db.Text
+  photograph    String?
+  email         String?
+  phoneNumber   String?
+  order         Int      @default(0)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([position])
+  @@index([active])
+}
+
+enum Qualification {
+  HAFIZ
+  ALIM
+  MUFTI
+  PHD_ISLAMIC_STUDIES
+  MASTERS_ISLAMIC_STUDIES
+  BACHELORS_ISLAMIC_STUDIES
+  DIPLOMA
+  CERTIFICATE
+  OTHER
+}
+
+model Muallims {
+  id                 String         @id @default(cuid())
+  fullName           String
+  photograph         String?
+  biography          String         @db.Text
+  qualification      Qualification
+  areaOfSpecialization String
+  email              String?
+  phoneNumber        String?
+  active             Boolean        @default(true)
+  order              Int            @default(0)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([active])
+  @@fulltext([fullName, areaOfSpecialization])
+}
+
+// ============ EVENTS ============
+
+enum EventStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+model Events {
+  id            String         @id @default(cuid())
+  title         String
+  description   String         @db.Text
+  image         String?
+  location      String
+  startDate     DateTime
+  endDate       DateTime?
+  status        EventStatus    @default(UPCOMING)
+  capacity      Int?
+  registrationOpen Boolean      @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  registrations EventRegistrations[]
+
+  @@index([status])
+  @@index([startDate])
+  @@fulltext([title])
+}
+
+model EventRegistrations {
+  id            String   @id @default(cuid())
+  eventId       String
+  fullName      String
+  email         String
+  phoneNumber   String
+  numberOfGuests Int    @default(1)
+  specialRequests String?
+  registeredAt  DateTime @default(now())
+  event         Events   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([email])
+}
+
+// ============ MEDIA & GALLERY ============
+
+model Albums {
+  id        String   @id @default(cuid())
+  title     String
+  description String?
+  cover     String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  images    Gallery[]
+
+  @@index([createdAt])
+}
+
+model Gallery {
+  id        String   @id @default(cuid())
+  albumId   String?
+  title     String
+  description String?
+  imageUrl  String
+  videoUrl  String?
+  type      String   @default("image")
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  album     Albums?  @relation(fields: [albumId], references: [id], onDelete: SetNull)
+
+  @@index([albumId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ============ MEMBERSHIP ============
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model MembershipApplications {
+  id            String            @id @default(cuid())
+  fullName      String
+  gender        Gender
+  dateOfBirth   DateTime
+  occupation    String
+  email         String
+  phoneNumber   String
+  address       String
+  state         String
+  country       String
+  status        ApplicationStatus @default(PENDING)
+  notes         String?
+  appliedAt     DateTime          @default(now())
+  reviewedAt    DateTime?
+  reviewedBy    String?
+
+  @@index([status])
+  @@index([email])
+  @@index([appliedAt])
+}
+
+// ============ CONTACT & COMMUNICATION ============
+
+model ContactMessages {
+  id        String   @id @default(cuid())
+  fullName  String
+  email     String
+  subject   String
+  message   String   @db.Text
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([read])
+  @@index([createdAt])
+  @@index([email])
+}
+
+// ============ SETTINGS & CONFIGURATION ============
+
+model Settings {
+  id              String  @id @default(cuid())
+  key             String  @unique
+  value           String  @db.Text
+  description     String?
+
+  @@index([key])
+}
+
+// ============ SOCIAL MEDIA ============
+
+model SocialMedia {
+  id      String @id @default(cuid())
+  platform String @unique
+  url     String
+  handle  String?
+  active  Boolean @default(true)
+}
